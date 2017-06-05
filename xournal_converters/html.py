@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 from argparse import ArgumentParser
 from xml.etree.cElementTree import ElementTree
-from StringIO import StringIO
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
+
 import gzip, cgi
 
 
@@ -24,7 +28,7 @@ def main():
 
     errors = []
 
-    io = StringIO()
+    iostr = StringIO()
     for page in xml.getroot().iter('page'):
         # determine background info
         background = page.find('background')
@@ -32,69 +36,73 @@ def main():
             background_color = background.attrib['color']
             if background.attrib['style'] != 'plain':
                 errors.append("Do not know how to handle background style '%s'"
-                              % background.attrib['style'])
+                        .format( background.attrib['style']) )
         else:
-            errors.append("Do not know how to handle background type '%s'" %
-                          background.attrib['type'])
+            errors.append("Do not know how to handle background type '%s'"
+                    .format( background.attrib['type']) )
 
         # start new page
-        print >> io, '<p>'
-        print >> io, '<svg width="%spt" height="%spt" style="border: 1px solid black; background-color: %s" viewBox="0 0 %s %s">' % (
-            page.attrib['width'], page.attrib['height'], background_color,
-            page.attrib['width'], page.attrib['height'])
+        print('<p>',file=iostr)
+        print('<svg width="%spt" height="%spt" style="border: 1px solid black; background-color: %s" viewBox="0 0 %s %s">'
+                .format(
+                page.attrib['width'], page.attrib['height'], background_color,
+                page.attrib['width'], page.attrib['height']),file=iostr)
         for layer in page.iter('layer'):
-            print >> io, '<g>'
+            print('<g>',file=iostr)
             for item in layer:
                 if item.tag == 'stroke':
                     if item.attrib["tool"] not in ["pen", "highlighter"]:
                         errors.append(
-                            "Do not know how to handle stroke tool '%s'" %
-                            item.attrib['tool'])
-                    print >> io, '<path d="%s" fill="none" stroke="%s" stroke-width="%s"' % (
-                        coords(item), item.attrib["color"],
-                        item.attrib["width"]),
+                            "Do not know how to handle stroke tool '%s'"
+                            .format( item.attrib['tool']) )
+                    print('<path d="%s" fill="none" stroke="%s" stroke-width="%s"'
+                            .format(
+                            coords(item), item.attrib["color"],
+                            item.attrib["width"]), file=iostr)
                     if item.attrib["tool"] == "highlighter":
-                        print >> io, 'stroke-opacity="0.5"',
-                    print >> io, '/>'
+                        print('stroke-opacity="0.5"',file=iostr)
+                    print('/>',file=iostr)
                 elif item.tag == 'text':
                     dy = 0
                     font_size = float(item.attrib["size"])
                     for line in item.text.split("\n"):
-                        print >> io, '<text font-family="%s" font-size="%s" x="%s" y="%s" fill="%s">%s</text>' % (
-                            item.attrib["font"], font_size, item.attrib["x"],
-                            dy + float(item.attrib["y"]) + font_size,
-                            item.attrib["color"], cgi.escape(line))
+                        print('<text font-family="%s" font-size="%s" x="%s" y="%s" fill="%s">%s</text>'
+                                .format(
+                                item.attrib["font"], font_size, item.attrib["x"],
+                                dy + float(item.attrib["y"]) + font_size,
+                                item.attrib["color"], cgi.escape(line)) ,file=iostr)
 
                         dy += float(item.attrib["size"])
                 elif item.tag == 'image':
-                    print >> io, '<image x="%s" y="%s" width="%s" height="%s" xlink:href="data:image/png;base64,%s" />' % (
-                        item.attrib["left"], item.attrib["top"],
-                        float(item.attrib["right"]) -
-                        float(item.attrib["left"]),
-                        float(item.attrib["bottom"]) -
-                        float(item.attrib["top"]), cgi.escape(item.text))
+                    print('<image x="%s" y="%s" width="%s" height="%s" xlink:href="data:image/png;base64,%s" />'
+                            .format(
+                            item.attrib["left"], item.attrib["top"],
+                            float(item.attrib["right"]) -
+                            float(item.attrib["left"]),
+                            float(item.attrib["bottom"]) -
+                            float(item.attrib["top"]), cgi.escape(item.text)) ,file=iostr)
                 else:
-                    errors.append("Unknown item '%s'" % item.tag)
-            print >> io, '</g>'
-        print >> io, '</svg>'
-        print >> io, '</p>'
+                    errors.append("Unknown item '%s'".format(item.tag))
+            print('</g>',file=iostr)
+        print('</svg>',file=iostr)
+        print('</p>',file=iostr)
 
     # render document with errors prefixed
-    print '<html>'
-    print '<body>'
+    print ('<html>')
+    print ('<body>')
 
     if errors:
-        print '<p>'
-        print '<ul style="color: red">'
+        print ('<p>')
+        print ('<ul style="color: red">')
         for e in errors:
-            print '<li>', e, '</li>'
-        print '</ul>'
-        print '</p>'
+            print ('<li>', e, '</li>')
+        print ('</ul>')
+        print ('</p>')
 
-    print io.getvalue()
+    print (iostr.getvalue())
 
-    print '</body>'
-    print '</html>'
+    print ('</body>')
+    print ('</html>')
 
 
 if __name__ == '__main__':
